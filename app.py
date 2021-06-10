@@ -1,0 +1,99 @@
+from flask import Flask
+from flask import jsonify, request
+from flask_cors import CORS
+
+from flask_sqlalchemy import SQLAlchemy
+
+from sqlalchemy import Column, Integer, String, Float
+
+
+# Init flask app
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://postgres:postgres@localhost:5433/db_scan'
+
+db = SQLAlchemy(app)
+db.create_all()
+
+# Allow cors
+
+CORS(app)
+
+
+
+# Models
+
+class BGP(db.Model):
+    '''
+    1299 174 14522
+      216.218.252.167 from 216.218.252.167 (216.218.252.167)
+        Origin IGP, metric 48, localpref 70, valid, internal
+        Originator: 216.218.252.176, Cluster list: 216.218.252.151
+        Last update: Fri Jun  4 21:42:22 2021
+    '''
+
+    __tablename__ = 'bgp'
+
+    id = Column(Integer, primary_key=True)
+    ip = Column(String, nullable=False)
+    network = Column(String, nullable=False)
+    next_hop = Column(String, nullable=False)
+    metric = Column(String, nullable=False)
+    locprof = Column(String, nullable=False)
+    path = Column(String, nullable=False)
+    cluster_list = Column(String, nullable=True)
+    origin = Column(String, nullable=False)
+    last_update = Column(String, nullable=False)
+  
+    def __init__(self, ip, network, next_hop, metric, locprof, path, cluster_list,
+                 origin, last_update):
+        self.ip = ip
+        self.network = network
+        self.next_hop = next_hop
+        self.metric = metric
+        self.locprof = locprof
+        self.path = path
+        self.cluster_list = cluster_list
+        self.origin = origin
+        self.last_update = last_update
+
+    def __repr__(self):
+        return f'BGP({self.network} -> {self.next_hop} ({self.path}))'
+
+    def __str__(self):
+        return f'{self.ip} (self.network)'
+
+    def as_dict(self):
+        result = {
+            'ip': self.ip,
+            'network': self.network,
+            'next_hop': self.next_hop,
+            'metric': self.metric,
+            'locprof': self.locprof,
+            'path': self.path,
+            'cluster_list': self.cluster_list,
+            'origin': self.origin,
+            'last_update': self.last_update
+        }
+        return result
+
+
+# Routes
+
+@app.route('/bgp/', methods=['GET'])
+def bgp_list(pk=None):
+    q_ip = request.args.get('ip', None)
+
+    response = []
+    try:
+        if q_ip:
+            response = BGP.query.filter_by(ip=q_ip)
+            response = [_.as_dict() for _ in response]
+    except Exception as e:
+        print(e)
+        response = {
+            'error': True,
+            'msg': 'No se pudo consultar el bgp de la ip, intente nuevamente'
+        }
+
+    return jsonify(response)
